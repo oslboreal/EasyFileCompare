@@ -51,9 +51,6 @@
     <ApplicationIcon>comparador.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="NS.Librerias.Winforms">
-      <HintPath>D:\TFSSERV004\Assemblies\NS.Librerias.Winforms\v1\NS.Librerias.Winforms.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -68,13 +65,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ArchivoHelper.cs" />
-    <Compile Include="EncodingComparacion.cs" />
-    <Compile Include="ComparadorHelper.cs" />
-    <Compile Include="Form1.cs">
+    <Compile Include="ProcesoComparador.cs" />
+    <Compile Include="FormPrincipal.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Form1.Designer.cs">
-      <DependentUpon>Form1.cs</DependentUpon>
+    <Compile Include="FormPrincipal.Designer.cs">
+      <DependentUpon>FormPrincipal.cs</DependentUpon>
     </Compile>
     <Compile Include="Help.cs">
       <SubType>Form</SubType>
@@ -84,8 +80,8 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <EmbeddedResource Include="Form1.resx">
-      <DependentUpon>Form1.cs</DependentUpon>
+    <EmbeddedResource Include="FormPrincipal.resx">
+      <DependentUpon>FormPrincipal.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Help.resx">
       <DependentUpon>Help.cs</DependentUpon>

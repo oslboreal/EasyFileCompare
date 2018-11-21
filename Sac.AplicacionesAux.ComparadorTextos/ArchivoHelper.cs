@@ -6,8 +6,19 @@ using System.Text;
 
 namespace Sac.AplicacionesAux.ComparadorTextos
 {
+    /// <summary>
+    /// Clase con herramientas útiles para la manipulación de ficheros.
+    /// </summary>
     public class ArchivoHelper
     {
+        /// <summary>
+        /// Método encargado de ordenar un archivo.
+        /// </summary>
+        /// <param name="rutaArchivoOrigen"></param>
+        /// <param name="rutaArchivoDestino"></param>
+        /// <param name="ordernarPor"></param>
+        /// <param name="codificacionEntrada"></param>
+        /// <param name="codificacionSalida"></param>
         public static void Ordenar(string rutaArchivoOrigen, string rutaArchivoDestino, Func<string, string> ordernarPor, Encoding codificacionEntrada, Encoding codificacionSalida)
         {
             // Si no hay funcion de ordenamiento el archivo de salida es el de entrada.
@@ -24,13 +35,15 @@ namespace Sac.AplicacionesAux.ComparadorTextos
 
             try
             {
-                DividirArchivo(rutaArchivoOrigen, directorioTemp, codificacionEntrada, codificacionSalida);
+                ParticionarArchivo(rutaArchivoOrigen, directorioTemp, codificacionEntrada, codificacionSalida);
                 OrdenarParticiones(ordernarPor, directorioTemp, codificacionSalida);
                 UnirParticiones(rutaArchivoOrigen, ordernarPor, directorioTemp, codificacionSalida);
             }
             catch
             {
-                // log
+                // Si existen particiones, las elimino.
+                BorrarParticiones(directorioTemp);
+                throw new Exception("Error a la hora de ordenar un archivo.");
             }
             finally
             {
@@ -39,7 +52,15 @@ namespace Sac.AplicacionesAux.ComparadorTextos
             }
         }
 
-        public static String[] DividirArchivo(string rutaArchivo, string directorioTemp, Encoding codificacionEntrada, Encoding codificacionSalida)
+        /// <summary>
+        /// Método encargado de particionar un archivo para su manipulación.
+        /// </summary>
+        /// <param name="rutaArchivo"></param>
+        /// <param name="directorioTemp"></param>
+        /// <param name="codificacionEntrada"></param>
+        /// <param name="codificacionSalida"></param>
+        /// <returns></returns>
+        public static String[] ParticionarArchivo(string rutaArchivo, string directorioTemp, Encoding codificacionEntrada, Encoding codificacionSalida)
         {
             //string nombreArchivoActual = new FileInfo(rutaArchivo).Name;
             String[] retorno;
@@ -105,70 +126,6 @@ namespace Sac.AplicacionesAux.ComparadorTextos
             }
         }
 
-        public static String[] DividirArchivo(string rutaArchivo, string directorioTemp, string nombreParticion, Encoding codificacionEntrada, Encoding codificacionSalida)
-        {
-            String[] retorno;
-            List<string> rutasParaRetornar = new List<string>();
-            StreamWriter sw = null;
-            int split_num = 1;
-            try
-            {
-                // Creo 1ra particion.
-                sw = new StreamWriter(Path.Combine(directorioTemp, string.Format(nombreParticion + "split{0:d5}.dat", split_num)), false, codificacionSalida);
-                rutasParaRetornar.Add(Path.Combine(directorioTemp, string.Format(nombreParticion + "split{0:d5}.dat", split_num)));
-                using (var sr = new StreamReader(rutaArchivo, codificacionEntrada))
-                {
-                    int corte = sr.BaseStream.Length > 100000000
-                        ? 100000000
-                        : 10000000;
-
-                    while (sr.Peek() >= 0)
-                    {
-                        // Copio linea
-                        var linea = sr.ReadLine();
-                        if (linea.Trim() != string.Empty)
-                            sw.WriteLine(linea);
-
-                        // Si el archivo es grande lo particiono (si esta era la última línea, entonces no te molestes)
-                        if (sw.BaseStream.Length > corte && sr.Peek() >= 0)
-                        {
-                            // Cierro conexion anterior
-                            sw.Close();
-
-                            // Incremento nro particion
-                            split_num++;
-
-                            // Creo n particion
-                            rutasParaRetornar.Add(Path.Combine(directorioTemp, string.Format(nombreParticion + "split{0:d5}.dat", split_num)));
-                            sw = new StreamWriter(Path.Combine(directorioTemp, string.Format(nombreParticion + "split{0:d5}.dat", split_num)), false, codificacionSalida);
-                        }
-                    }
-
-                    // Establecemos el tamaño del arreglo en función de la cantidad de Splits.
-                    retorno = new String[split_num];
-
-                    // Cargamos el arreglo para el retorno.
-                    for (int i = 0; i < rutasParaRetornar.Count; i++)
-                    {
-                        retorno[i] = rutasParaRetornar[i];
-                    }
-
-                    // Vaciamos la lista auxiliar..
-                    rutasParaRetornar.Clear();
-                }
-                return retorno;
-            }
-            catch
-            {
-                throw;
-            }
-            finally
-            {
-                if (sw != null)
-                    sw.Close();
-            }
-        }
-
         /// <summary>
         /// Método encargado de obtener todos los ficheros de particion de un fichero y ordenarlos.
         /// </summary>
@@ -197,19 +154,13 @@ namespace Sac.AplicacionesAux.ComparadorTextos
             }
         }
 
-        public static void BorrarParticiones(string directorioTemp)
-        {
-            // Traigo todas las rutas del directorio.
-            foreach (string ruta in Directory.GetFiles(directorioTemp, "split*.dat"))
-            {
-                // Elimino el archivo.
-                File.Delete(ruta);
-
-                // Libero memoria.
-                GC.Collect();
-            }
-        }
-
+        /// <summary>
+        /// Método encargado de obtener todos los archivos de particion y unirlos en un único archivo.
+        /// </summary>
+        /// <param name="archivoDestino"></param>
+        /// <param name="keySelector"></param>
+        /// <param name="directorioTemp"></param>
+        /// <param name="codificacion"></param>
         private static void UnirParticiones(string archivoDestino, Func<string, string> keySelector, string directorioTemp, Encoding codificacion)
         {
             var rutas = Directory.GetFiles(directorioTemp, "sorted*.dat");
@@ -217,7 +168,7 @@ namespace Sac.AplicacionesAux.ComparadorTextos
             var recordsize = 100;
             var memoriaMax = 500000000;
             var buffersize = memoriaMax / cantParticiones;
-            var recordoverhead = 7.5; // TODO: Preguntar a mati de donde sale esta constante
+            var recordoverhead = 7.5;
             var buffer = (int)(buffersize / recordsize / recordoverhead);
 
             // Abro los archivos de las particiones
@@ -232,7 +183,7 @@ namespace Sac.AplicacionesAux.ComparadorTextos
 
             // Cargo las colas con lineas de las particiones.
             for (int i = 0; i < cantParticiones; i++)
-                CargoCola(colas[i], archivos[i], buffer);
+                CargarCola(colas[i], archivos[i], buffer);
 
             // Empieza el MERGE!
 
@@ -278,7 +229,7 @@ namespace Sac.AplicacionesAux.ComparadorTextos
                     // Have we emptied the queue? Top it up
                     if (colas[lowestIndex].Count == 0)
                     {
-                        CargoCola(colas[lowestIndex], archivos[lowestIndex], buffer);
+                        CargarCola(colas[lowestIndex], archivos[lowestIndex], buffer);
 
                         // Was there nothing left to read?
                         if (colas[lowestIndex].Count == 0)
@@ -296,12 +247,28 @@ namespace Sac.AplicacionesAux.ComparadorTextos
         }
 
         /// <summary>
+        /// Método encargado de obtener las particiones existentes y borrarlas.
+        /// </summary>
+        /// <param name="directorioTemp"></param>
+        public static void BorrarParticiones(string directorioTemp)
+        {
+            foreach (string ruta in Directory.GetFiles(directorioTemp, "split*.dat"))
+            {
+                // Elimino el archivo.
+                File.Delete(ruta);
+
+                // Libero memoria.
+                GC.Collect();
+            }
+        }
+
+        /// <summary>
         /// Método encargado de recorrer un archivo y encolar todos sus registros.
         /// </summary>
         /// <param name="cola"></param>
         /// <param name="archivo"></param>
         /// <param name="buffer"></param>
-        private static void CargoCola(Queue<string> cola, StreamReader archivo, int buffer)
+        private static void CargarCola(Queue<string> cola, StreamReader archivo, int buffer)
         {
             for (int i = 0; i < buffer; i++)
             {
@@ -317,7 +284,7 @@ namespace Sac.AplicacionesAux.ComparadorTextos
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public static Encoding obtenerEncoding(string path)
+        public static Encoding ObtenerEncoding(string path)
         {
             Encoding retorno;
             using (var reader = new StreamReader(path, Encoding.GetEncoding(20127), true))
@@ -326,19 +293,6 @@ namespace Sac.AplicacionesAux.ComparadorTextos
                 retorno = reader.CurrentEncoding;
             }
             return retorno;
-        }
-
-        /// <summary>
-        /// Método encargado de retornar el nombre del archivo sin espacios.
-        /// </summary>
-        /// <param name="path"></param>
-        /// <returns></returns>
-        public static string ObtenerNombreSinEspacios(string path)
-        {
-            // Obtenemos los nombres de los archivos para asignar un nombre coherente al archivo de salida.
-            var nombreFicheroA = new FileInfo(path).Name;
-            nombreFicheroA = Path.GetFileNameWithoutExtension(nombreFicheroA).Replace(" ", "");
-            return nombreFicheroA;
         }
     }
 }
